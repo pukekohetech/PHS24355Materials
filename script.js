@@ -1,12 +1,31 @@
-/* script.js – core logic + JSON loading + Web Share API (camera-stamper style) */
+/* script.js – core logic + JSON loading + Web Share API */
 const STORAGE_KEY = "TECH_DATA";
-let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { answers: {} };
+let data;
+try {
+  data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { answers: {} };
+} catch (_) {
+  data = { answers: {} };
+}
 let currentAssessment = null;
 let finalData = null;
 
 const XOR_KEY = 42;
-const xor = s => btoa([...s].map(c => String.fromCharCode(c.charCodeAt(0) ^ XOR_KEY)).join(''));
-const unxor = s => atob(s).split('').map(c => String.fromCharCode(c.charCodeAt(0) ^ XOR_KEY)).join('');
+const xor = s =>
+  btoa(
+    [...s]
+      .map(c => String.fromCharCode(c.charCodeAt(0) ^ XOR_KEY))
+      .join("")
+  );
+const unxor = s => {
+  try {
+    return atob(s)
+      .split("")
+      .map(c => String.fromCharCode(c.charCodeAt(0) ^ XOR_KEY))
+      .join("");
+  } catch (_) {
+    return "";
+  }
+};
 
 // Global variables filled from JSON
 let APP_TITLE, APP_SUBTITLE, TEACHERS, ASSESSMENTS;
@@ -16,7 +35,7 @@ let APP_TITLE, APP_SUBTITLE, TEACHERS, ASSESSMENTS;
    -------------------------------------------------------------- */
 async function loadQuestions() {
   try {
-    const res = await fetch('questions.json');
+    const res = await fetch("questions.json");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
@@ -29,10 +48,11 @@ async function loadQuestions() {
       ...ass,
       questions: ass.questions.map(q => ({
         ...q,
-        rubric: q.rubric?.map(r => ({
-          ...r,
-          check: new RegExp(r.check, 'i')
-        })) || []
+        rubric:
+          q.rubric?.map(r => ({
+            ...r,
+            check: new RegExp(r.check, "i")
+          })) || []
       }))
     }));
   } catch (err) {
@@ -72,14 +92,16 @@ function initApp() {
   const teacherSel = document.getElementById("teacher");
   TEACHERS.forEach(t => {
     const o = document.createElement("option");
-    o.value = t.email; o.textContent = t.name;
+    o.value = t.email;
+    o.textContent = t.name;
     teacherSel.appendChild(o);
   });
 
   const assSel = document.getElementById("assessmentSelector");
   ASSESSMENTS.forEach((a, i) => {
     const o = document.createElement("option");
-    o.value = i; o.textContent = `${a.title} – ${a.subtitle}`;
+    o.value = i;
+    o.textContent = `${a.title} – ${a.subtitle}`;
     assSel.appendChild(o);
   });
 }
@@ -104,10 +126,13 @@ function loadAssessment() {
   container.innerHTML = `<div class="assessment-header"><h2>${currentAssessment.title}</h2><p>${currentAssessment.subtitle}</p></div>`;
 
   currentAssessment.questions.forEach(q => {
-    const saved = data.answers[currentAssessment.id]?.[q.id] ? unxor(data.answers[currentAssessment.id][q.id]) : "";
-    const field = q.type === "long"
-      ? `<textarea rows="5" id="a${q.id}" class="answer-field">${saved}</textarea>`
-      : `<input type="text" id="a${q.id}" value="${saved}" class="answer-field">`;
+    const saved = data.answers[currentAssessment.id]?.[q.id]
+      ? unxor(data.answers[currentAssessment.id][q.id])
+      : "";
+    const field =
+      q.type === "long"
+        ? `<textarea rows="5" id="a${q.id}" class="answer-field">${saved}</textarea>`
+        : `<input type="text" id="a${q.id}" value="${saved}" class="answer-field">`;
 
     const div = document.createElement("div");
     div.className = "q";
@@ -119,7 +144,9 @@ function loadAssessment() {
 }
 
 function saveAnswer(qid) {
-  const val = document.getElementById("a" + qid).value;
+  const el = document.getElementById("a" + qid);
+  if (!el) return;
+  const val = el.value;
   if (!data.answers[currentAssessment.id]) data.answers[currentAssessment.id] = {};
   data.answers[currentAssessment.id][qid] = xor(val);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -131,17 +158,25 @@ function getAnswer(id) {
 }
 
 function gradeIt() {
-  let total = 0, results = [];
+  let total = 0,
+    results = [];
   currentAssessment.questions.forEach(q => {
     const ans = getAnswer(q.id);
-    let earned = 0, hints = [];
+    let earned = 0,
+      hints = [];
 
     if (q.rubric) {
       q.rubric.forEach(r => {
-        if (r.check.test(ans)) earned += r.points;
-        else if (r.hint) hints.push(r.hint);
+        if (r.check.test(ans)) {
+          earned += r.points;
+        } else if (r.hint) {
+          hints.push(r.hint);
+        }
       });
     }
+
+    // Cap at maxPoints for safety
+    earned = Math.min(earned, q.maxPoints);
 
     total += earned;
     const isCorrect = earned === q.maxPoints;
@@ -149,122 +184,197 @@ function gradeIt() {
       id: q.id.toUpperCase(),
       question: q.text,
       answer: ans || "(blank)",
-      earned, max: q.maxPoints,
-      markText: isCorrect ? "Correct" : earned > 0 ? "Incorrect (partial)" : "Incorrect",
-      hint: hints.length ? hints.join(" • ") : (isCorrect ? "" : q.hint || "Check your answer")
+      earned,
+      max: q.maxPoints,
+      markText: isCorrect
+        ? "Correct"
+        : earned > 0
+        ? "Incorrect (partial)"
+        : "Incorrect",
+      hint: hints.length
+        ? hints.join(" • ")
+        : isCorrect
+        ? ""
+        : q.hint || "Check your answer"
     });
   });
+
   return { total, results };
 }
 
 /* --------------------------------------------------------------
    Submit & show results
    -------------------------------------------------------------- */
-window.submitWork = function () {
+function submitWork() {
   saveStudentInfo();
-  const name = data.name, id = data.id;
-  if (!name || !id || !data.teacher) return alert("Fill Name, ID and Teacher");
+  const name = data.name,
+    id = data.id;
+  if (!name || !id || !data.teacher)
+    return alert("Fill Name, ID and Teacher");
   if (!currentAssessment) return alert("Select an assessment");
-  if (data.id && document.getElementById("id").value !== data.id) return alert("ID locked to: " + data.id);
+  if (data.id && document.getElementById("id").value !== data.id)
+    return alert("ID locked to: " + data.id);
 
   const { total, results } = gradeIt();
-  const pct = Math.round((total / currentAssessment.totalPoints) * 100);
+  const totalPoints =
+    currentAssessment.totalPoints ||
+    currentAssessment.questions.reduce(
+      (sum, q) => sum + (q.maxPoints || 0),
+      0
+    );
+  const pct = totalPoints
+    ? Math.round((total / totalPoints) * 100)
+    : 0;
 
   finalData = {
-    name, id,
-    teacherName: document.getElementById("teacher").selectedOptions[0].textContent,
+    name,
+    id,
+    teacherName:
+      document.getElementById("teacher").selectedOptions[0].textContent,
     teacherEmail: data.teacher,
     assessment: currentAssessment,
-    points: total, totalPoints: currentAssessment.totalPoints, pct,
+    points: total,
+    totalPoints,
+    pct,
     submittedAt: new Date().toLocaleString(),
     results
   };
 
   document.getElementById("student").textContent = name;
-  document.getElementById("teacher-name").textContent = finalData.teacherName;
-  document.getElementById("grade").innerHTML = `${total}/${currentAssessment.totalPoints}<br><small>(${pct}%)</small>`;
+  document.getElementById("teacher-name").textContent =
+    finalData.teacherName;
+  document.getElementById(
+    "grade"
+  ).innerHTML = `${total}/${totalPoints}<br><small>(${pct}%)</small>`;
 
   const ansDiv = document.getElementById("answers");
   ansDiv.innerHTML = `<h3>${currentAssessment.title}<br><small>${currentAssessment.subtitle}</small></h3>`;
   results.forEach(r => {
     const d = document.createElement("div");
-    d.className = `feedback ${r.earned === r.max ? "correct" : r.earned > 0 ? "partial" : "wrong"}`;
-    d.innerHTML = `<strong>${r.id}: ${r.earned}/${r.max} — ${r.markText}</strong><br>Your answer: <em>${r.answer}</em><br>${r.earned < r.max ? "<strong>Tip:</strong> " + r.hint : "Perfect!"}`;
+    d.className = `feedback ${
+      r.earned === r.max
+        ? "correct"
+        : r.earned > 0
+        ? "partial"
+        : "wrong"
+    }`;
+    d.innerHTML = `<strong>${r.id}: ${r.earned}/${r.max} — ${r.markText}</strong><br>Your answer: <em>${r.answer}</em><br>${
+      r.earned < r.max ? "<strong>Tip:</strong> " + r.hint : "Perfect!"
+    }`;
     ansDiv.appendChild(d);
   });
 
   document.getElementById("form").classList.add("hidden");
   document.getElementById("result").classList.remove("hidden");
-};
+}
 
-window.back = () => {
+function back() {
   document.getElementById("result").classList.add("hidden");
   document.getElementById("form").classList.remove("hidden");
-};
+}
 
 /* --------------------------------------------------------------
-   SHARE PDF via Web Share API (camera-stamper style)
+   Simple share helper – let the device decide
    -------------------------------------------------------------- */
-window.emailWork = async function () {
+async function sharePDF(file) {
+  // Web Share Level 2 with files
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: file.name,
+        text: "Generated assessment PDF"
+      });
+      showToast("Shared");
+    } catch (err) {
+      console.warn(err);
+      if (!String(err).includes("AbortError")) {
+        showToast("Share failed", false);
+      }
+    }
+    return;
+  }
+
+  // Fallback → download
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  showToast("Downloaded (share not supported)");
+}
+
+/* --------------------------------------------------------------
+   SHARE PDF via Web Share API
+   -------------------------------------------------------------- */
+async function emailWork() {
   if (!finalData) return alert("Submit first!");
 
   // Load PDF libraries
-  const load = src => new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = res;
-    s.onerror = rej;
-    document.head.appendChild(s);
-  });
+  const load = src =>
+    new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = res;
+      s.onerror = rej;
+      document.head.appendChild(s);
+    });
 
   try {
-    await load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-    await load('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await load(
+      "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+    );
+    await load(
+      "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+    );
   } catch (e) {
     return showToast("Failed to load PDF tools", false);
   }
 
   const { jsPDF } = window.jspdf;
-  const resultEl = document.getElementById('result');
-  const btns = document.querySelectorAll('.btn-group');
+  const resultEl = document.getElementById("result");
+  const btns = document.querySelectorAll(".btn-group");
 
   // Hide buttons while capturing
-  btns.forEach(b => b.style.display = 'none');
+  btns.forEach(b => (b.style.display = "none"));
 
   const canvas = await html2canvas(resultEl, { scale: 2 });
-  const imgData = canvas.toDataURL('image/png');
+  const imgData = canvas.toDataURL("image/png");
 
   // Show buttons again
-  btns.forEach(b => b.style.display = '');
+  btns.forEach(b => (b.style.display = ""));
 
-  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pdf = new jsPDF("p", "mm", "a4");
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
 
-  // Try to load crest
+  // Optional crest
   let crestImg = null;
   try {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    img.crossOrigin = "anonymous";
     await new Promise(res => {
       img.onload = res;
       img.onerror = res;
-      img.src = 'PHS_Crest.png?t=' + Date.now();
+      img.src = "PHS_Crest.png?t=" + Date.now();
     });
     if (img.width) crestImg = img;
   } catch (_) {}
 
   const drawHeader = (y = 0) => {
     pdf.setFillColor(26, 73, 113);
-    pdf.rect(0, y, pageW, 35, 'F');
+    pdf.rect(0, y, pageW, 35, "F");
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(18);
-    pdf.setFont('helvetica', 'bold');
+    pdf.setFont("helvetica", "bold");
     pdf.text(APP_TITLE, 14, y + 20);
     pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
+    pdf.setFont("helvetica", "normal");
     pdf.text(APP_SUBTITLE, 14, y + 28);
-    if (crestImg) pdf.addImage(crestImg, 'PNG', pageW - 38, y + 5, 28, 28);
+    if (crestImg) pdf.addImage(crestImg, "PNG", pageW - 38, y + 5, 28, 28);
   };
   drawHeader();
 
@@ -276,91 +386,67 @@ window.emailWork = async function () {
     40
   );
   pdf.setFillColor(240, 248, 255);
-  pdf.rect(14, 45, 60, 15, 'F');
+  pdf.rect(14, 45, 60, 15, "F");
   pdf.setTextColor(26, 73, 113);
   pdf.setFontSize(16);
-  pdf.setFont('helvetica', 'bold');
+  pdf.setFont("helvetica", "bold");
   pdf.text(
     `${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)`,
     18,
     55
   );
 
-  // Capture the result area into pages
+  // Image pagination
   const imgW = pageW - 28;
   const imgH = (canvas.height * imgW) / canvas.width;
   let position = 70;
   let heightLeft = imgH;
 
-  pdf.addImage(imgData, 'PNG', 14, position, imgW, imgH);
-  heightLeft -= (pageH - position - 10);
+  pdf.addImage(imgData, "PNG", 14, position, imgW, imgH);
+  heightLeft -= pageH - position - 10;
 
   while (heightLeft > 0) {
     pdf.addPage();
     drawHeader();
-    position = 50; // top margin on subsequent pages
-    pdf.addImage(imgData, 'PNG', 14, position, imgW, imgH);
-    heightLeft -= (pageH - position - 10);
+    position = 50;
+    pdf.addImage(imgData, "PNG", 14, position, imgW, imgH);
+    heightLeft -= pageH - position - 10;
   }
 
   pdf.setFontSize(9);
   pdf.setTextColor(100, 100, 100);
   pdf.text("Generated by Pukekohe High Tech Dept", 14, pageH - 10);
 
-  const filename = `${finalData.name.replace(/\s+/g, '_')}_${finalData.assessment.id}_${finalData.pct}%.pdf`;
-  const pdfBlob = pdf.output('blob');
-  const stampedFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+  const filename = `${finalData.name.replace(/\s+/g, "_")}_${
+    finalData.assessment.id
+  }_${finalData.pct}%.pdf`;
+  const pdfBlob = pdf.output("blob");
+  const stampedFile = new File([pdfBlob], filename, {
+    type: "application/pdf"
+  });
 
-  // Neutral share info – let the device choose app
-  const shareTitle = `${finalData.assessment.title} – ${finalData.name}`;
-  const shareText = `Score: ${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)`;
-
-  try {
-    if (navigator.canShare && navigator.canShare({ files: [stampedFile] })) {
-      await navigator.share({
-        files: [stampedFile],
-        title: shareTitle,
-        text: shareText
-      });
-      showToast("Shared");
-    } else {
-      // Fallback: just download the PDF and let the user do what they like
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(stampedFile);
-      a.download = stampedFile.name;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(a.href);
-        a.remove();
-      }, 0);
-      showToast("Downloaded (share not supported)");
-    }
-  } catch (e) {
-    console.warn(e);
-    if (!String(e).includes('AbortError')) {
-      showToast("Share cancelled or unsupported", false);
-    }
-  }
-};
+  // Let the device decide how to share (or download)
+  await sharePDF(stampedFile);
+}
 
 /* --------------------------------------------------------------
-   Toast helper (from camera stamper)
+   Toast helper
    -------------------------------------------------------------- */
 function showToast(text, ok = true) {
-  const toast = document.getElementById('toast') || createToastElement();
+  const toast = document.getElementById("toast") || createToastElement();
   toast.textContent = text;
-  toast.classList.toggle('error', !ok);
-  toast.style.display = 'block';
+  toast.classList.toggle("error", !ok);
+  toast.style.display = "block";
   clearTimeout(showToast._t);
-  showToast._t = setTimeout(() => toast.style.display = 'none', 3200);
+  showToast._t = setTimeout(() => (toast.style.display = "none"), 3200);
 }
 
 function createToastElement() {
-  const t = document.createElement('div');
-  t.id = 'toast';
-  t.className = 'toast';
-  t.role = 'status';
+  const t = document.createElement("div");
+  t.id = "toast";
+  t.className = "toast";
+  t.role = "status";
+  t.setAttribute("aria-live", "polite");
   t.style.cssText = `
     display: none; padding: 10px 12px; border-radius: 6px;
     background: #16a34a; color: #fff; position: fixed; bottom: 20px; left: 50%;
@@ -374,19 +460,32 @@ function createToastElement() {
 /* --------------------------------------------------------------
    Protection
    -------------------------------------------------------------- */
-const PASTE_BLOCKED_MESSAGE = 'Pasting blocked!';
-async function clearClipboard() { try { await navigator.clipboard.writeText(''); } catch (_) {} }
-(async () => { await clearClipboard(); })();
+const PASTE_BLOCKED_MESSAGE = "Pasting blocked!";
+async function clearClipboard() {
+  if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+  try {
+    await navigator.clipboard.writeText("");
+  } catch (_) {}
+}
+(async () => {
+  await clearClipboard();
+})();
 
 function attachProtection() {
-  document.querySelectorAll('.answer-field').forEach(f => {
-    f.addEventListener('input', () => saveAnswer(f.id.slice(1)));
-    f.addEventListener('paste', e => { e.preventDefault(); showToast(PASTE_BLOCKED_MESSAGE, false); clearClipboard(); });
-    f.addEventListener('copy', e => e.preventDefault());
-    f.addEventListener('cut', e => e.preventDefault());
+  document.querySelectorAll(".answer-field").forEach(f => {
+    f.addEventListener("input", () => saveAnswer(f.id.slice(1)));
+    f.addEventListener("paste", e => {
+      e.preventDefault();
+      showToast(PASTE_BLOCKED_MESSAGE, false);
+      clearClipboard();
+    });
+    f.addEventListener("copy", e => e.preventDefault());
+    f.addEventListener("cut", e => e.preventDefault());
   });
 }
-document.addEventListener('contextmenu', e => { if (!e.target.matches('input, textarea')) e.preventDefault(); });
+document.addEventListener("contextmenu", e => {
+  if (!e.target.matches("input, textarea")) e.preventDefault();
+});
 
 /* --------------------------------------------------------------
    Export functions for HTML onclick
