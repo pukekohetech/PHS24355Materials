@@ -308,11 +308,12 @@ async function sharePDF(file) {
 }
 
 /* --------------------------------------------------------------
-   Generate PDF – FIXED: No extra page, shows user + teacher info
+   Generate PDF – CLEAN LAYOUT, FULL INFO (teacher email + login)
    -------------------------------------------------------------- */
 async function emailWork() {
   if (!finalData) return alert("Submit first!");
 
+  // Load jsPDF only
   const load = src => new Promise((res, rej) => {
     const s = document.createElement("script");
     s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s);
@@ -320,109 +321,121 @@ async function emailWork() {
 
   try {
     await load("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-    await load("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   } catch (e) {
-    return showToast("Failed to load PDF tools", false);
+    return showToast("Failed to load PDF tool", false);
   }
 
   const { jsPDF } = window.jspdf;
-  const resultEl = document.getElementById("result");
-  const btns = document.querySelectorAll(".btn-group");
-  btns.forEach(b => b.style.display = "none");
-
-  const canvas = await html2canvas(resultEl, { scale: 2, useCORS: true });
-  btns.forEach(b => b.style.display = "");
-
-  const imgData = canvas.toDataURL("image/png");
-
-  // A4 Portrait – Enforced
   const pdf = new jsPDF("p", "mm", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 14;
-  const imgWidth = pageWidth - 2 * margin;
+  const margin = 15;
+  const lineHeight = 7;
+  let y = 20;
 
-  // Calculate image height
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  // === HEADER (Every Page) ===
-  const addHeader = () => {
-    pdf.setFillColor(26, 73, 113);
-    pdf.rect(0, 0, pageWidth, 30, "F");
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(16);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(APP_TITLE, margin, 18);
-    pdf.setFontSize(11);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(APP_SUBTITLE, margin, 25);
-  };
-
-  // === ADD FIRST PAGE ===
-  addHeader();
-
-  // === USER + TEACHER INFO (Always visible) ===
-  pdf.setTextColor(0, 0, 0);
-  pdf.setFontSize(10);
+  // ---------- HEADER ----------
+  pdf.setFillColor(26, 73, 113);
+  pdf.rect(0, 0, pageWidth, 35, "F");
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(18);
+  pdf.setFont("helvetica", "bold");
+  pdf.text(APP_TITLE, margin, 20);
+  pdf.setFontSize(12);
   pdf.setFont("helvetica", "normal");
+  pdf.text(APP_SUBTITLE, margin, 28);
 
-  const loginLabel = finalData.username 
-    ? ` (${finalData.username}${detectedUsername === finalData.username ? ' (Device Auto)' : ''})` 
+  // ---------- STUDENT / LOGIN / TEACHER ----------
+  pdf.setTextColor(0, 0, 0);
+  pdf.setFontSize(11);
+  y = 45;
+
+  // 1. Student name + **login name** (typed or auto-detected)
+  const loginLabel = finalData.username
+    ? ` (${finalData.username}${detectedUsername === finalData.username ? ' (Device Auto)' : ''})`
     : '';
+  pdf.text(`Student: ${finalData.name}${loginLabel}`, margin, y); y += lineHeight;
 
-  pdf.text(`${finalData.name}${loginLabel} • ID: ${finalData.id}`, margin, 35);
-  pdf.text(`Teacher: ${finalData.teacherName} <${finalData.teacherEmail}>`, margin, 41);
-  pdf.text(`Submitted: ${finalData.submittedAt}`, margin, 47);
+  // 2. Student ID
+  pdf.text(`ID: ${finalData.id}`, margin, y); y += lineHeight;
 
-  // === GRADE BOX ===
-  pdf.setFillColor(240, 248, 255);
-  pdf.rect(margin, 50, 60, 12, "F");
-  pdf.setTextColor(26, 73, 113);
+  // 3. **Teacher name + email**
+  pdf.text(`Teacher: ${finalData.teacherName} <${finalData.teacherEmail}>`, margin, y); y += lineHeight;
+
+  // 4. Submitted time
+  pdf.text(`Submitted: ${finalData.submittedAt}`, margin, y); y += 10;
+
+  // ---------- ASSESSMENT TITLE ----------
   pdf.setFontSize(14);
   pdf.setFont("helvetica", "bold");
-  pdf.text(`${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)`, margin + 3, 58);
+  pdf.text(`${finalData.assessment.title}`, margin, y); y += 7;
+  pdf.setFontSize(11);
+  pdf.setFont("helvetica", "normal");
+  pdf.text(`${finalData.assessment.subtitle}`, margin, y); y += 10;
 
-  // === IMAGE PLACEMENT (Start after header + info) ===
-  let yStart = 68; // Start image below header + info
-  const availableHeight = pageHeight - yStart - 15; // Bottom margin
+  // ---------- SCORE BOX ----------
+  pdf.setFillColor(240, 248, 255);
+  pdf.rect(margin, y - 5, 50, 10, "F");
+  pdf.setTextColor(26, 73, 113);
+  pdf.setFontSize(16);
+  pdf.setFont("helvetica", "bold");
+  pdf.text(`${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)`, margin + 3, y + 2);
+  y += 15;
 
-  if (imgHeight <= availableHeight) {
-    // Fits on one page
-    pdf.addImage(imgData, "PNG", margin, yStart, imgWidth, imgHeight);
-  } else {
-    // Multi-page
-    let heightLeft = imgHeight;
-    let sourceY = 0;
+  // ---------- QUESTIONS ----------
+  pdf.setFontSize(11);
+  pdf.setTextColor(0, 0, 0);
+  pdf.setFont("helvetica", "normal");
 
-    while (heightLeft > 0) {
-      const sliceHeight = Math.min(availableHeight, heightLeft);
-      const scaledSliceHeight = (sliceHeight * canvas.width) / imgWidth;
-
-      const sliceCanvas = document.createElement("canvas");
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = scaledSliceHeight;
-      const ctx = sliceCanvas.getContext("2d");
-      ctx.drawImage(canvas, 0, sourceY, canvas.width, scaledSliceHeight, 0, 0, canvas.width, scaledSliceHeight);
-
-      pdf.addImage(sliceCanvas.toDataURL("image/png"), "PNG", margin, yStart, imgWidth, sliceHeight);
-
-      heightLeft -= sliceHeight;
-      sourceY += scaledSliceHeight;
-
-      if (heightLeft > 0) {
-        pdf.addPage();
-        addHeader();
-        yStart = 40; // Reduced start on new pages
-      }
+  finalData.results.forEach(r => {
+    // Page break if needed
+    if (y > pageHeight - 40) {
+      pdf.addPage();
+      y = 45;
+      // Header on new page
+      pdf.setFillColor(26, 73, 113);
+      pdf.rect(0, 0, pageWidth, 35, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(APP_TITLE, margin, 20);
+      pdf.setFontSize(12);
+      pdf.text(APP_SUBTITLE, margin, 28);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(11);
     }
-  }
 
-  // === FOOTER ===
+    // Question line
+    pdf.setFont("helvetica", "bold");
+    pdf.text(`${r.id}: ${r.earned}/${r.max} — ${r.markText}`, margin, y); y += lineHeight;
+
+    // Question text (wrapped)
+    pdf.setFont("helvetica", "italic");
+    const qLines = pdf.splitTextToSize(r.question, pageWidth - 2 * margin);
+    qLines.forEach(l => { pdf.text(l, margin + 2, y); y += lineHeight; });
+
+    // Answer (wrapped)
+    pdf.setFont("helvetica", "normal");
+    const aLines = pdf.splitTextToSize(`Answer: ${r.answer}`, pageWidth - 2 * margin);
+    aLines.forEach(l => { pdf.text(l, margin + 2, y); y += lineHeight; });
+
+    // Tip (if any)
+    if (r.earned < r.max && r.hint) {
+      pdf.setFont("helvetica", "italic");
+      pdf.setTextColor(220, 53, 69);
+      const tLines = pdf.splitTextToSize(`Tip: ${r.hint}`, pageWidth - 2 * margin);
+      tLines.forEach(l => { pdf.text(l, margin + 2, y); y += lineHeight; });
+      pdf.setTextColor(0, 0, 0);
+    }
+
+    y += 5; // spacing
+  });
+
+  // ---------- FOOTER ----------
   pdf.setFontSize(9);
   pdf.setTextColor(100, 100, 100);
-  pdf.text("Generated by Pukekohe High Tech Dept", margin, pageHeight - 8);
+  pdf.text("Generated by Pukekohe High School Technology Dept", margin, pageHeight - 10);
 
-  // === SAVE & SHARE ===
+  // ---------- SAVE ----------
   const filename = `${finalData.name.replace(/\s+/g, "_")}_${finalData.assessment.id}_${finalData.pct}%.pdf`;
   const pdfBlob = pdf.output("blob");
   const file = new File([pdfBlob], filename, { type: "application/pdf" });
