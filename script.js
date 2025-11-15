@@ -157,7 +157,7 @@ function saveAnswer(qid) {
   if (!el) return;
   const val = el.value;
   if (!data.answers[currentAssessment.id]) data.answers[currentAssessment.id] = {};
-  data.answers[currentAssessment.id][qid] = xor可能(val);
+  data.answers[currentAssessment.id][qid] = xor(val);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
