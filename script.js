@@ -31,6 +31,13 @@ const unxor = s => {
 let APP_TITLE, APP_SUBTITLE, TEACHERS, ASSESSMENTS;
 
 /* --------------------------------------------------------------
+  serviceworker call
+   -------------------------------------------------------------- */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(console.error);
+}
+
+/* --------------------------------------------------------------
    Load questions.json
    -------------------------------------------------------------- */
 async function loadQuestions() {
