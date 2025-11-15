@@ -227,7 +227,17 @@ function submitWork() {
     results
   };
 
-  document.getElementById("student").textContent = `${name}${username ? ` (${username}${detectedUsername === username ? ' (Device Auto)' : ''})` : ''}`;
+  // Show student name + username/device login in the on-screen results
+const displayUsername = username || detectedUsername || "";
+document.getElementById("student").textContent =
+  `${name}${
+    displayUsername
+      ? ` (${displayUsername}${
+          detectedUsername && detectedUsername === displayUsername ? " (Device Auto)" : ""
+        })`
+      : ""
+  }`;
+
   document.getElementById("teacher-name").textContent = finalData.teacherName;
   document.getElementById("grade").innerHTML = `${total}/${totalPoints}<br><small>(${pct}%)</small>`;
 
