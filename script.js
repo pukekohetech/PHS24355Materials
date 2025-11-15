@@ -308,12 +308,12 @@ async function sharePDF(file) {
 }
 
 /* --------------------------------------------------------------
-   Generate PDF – CLEAN LAYOUT, FULL INFO (teacher email + login)
+   Generate PDF – FULL INFO: teacher email + device login name
    -------------------------------------------------------------- */
 async function emailWork() {
   if (!finalData) return alert("Submit first!");
 
-  // Load jsPDF only
+  // Load only jsPDF (no html2canvas)
   const load = src => new Promise((res, rej) => {
     const s = document.createElement("script");
     s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s);
@@ -349,7 +349,7 @@ async function emailWork() {
   pdf.setFontSize(11);
   y = 45;
 
-  // 1. Student name + **login name** (typed or auto-detected)
+  // 1. Student name + login (typed or auto-detected)
   const loginLabel = finalData.username
     ? ` (${finalData.username}${detectedUsername === finalData.username ? ' (Device Auto)' : ''})`
     : '';
@@ -358,7 +358,7 @@ async function emailWork() {
   // 2. Student ID
   pdf.text(`ID: ${finalData.id}`, margin, y); y += lineHeight;
 
-  // 3. **Teacher name + email**
+  // 3. Teacher name + e-mail (pulled from finalData)
   pdf.text(`Teacher: ${finalData.teacherName} <${finalData.teacherEmail}>`, margin, y); y += lineHeight;
 
   // 4. Submitted time
@@ -377,7 +377,7 @@ async function emailWork() {
   pdf.rect(margin, y - 5, 50, 10, "F");
   pdf.setTextColor(26, 73, 113);
   pdf.setFontSize(16);
-  pdf.setFont("helvetica", "bold");
+  pdf.setFont("helvetica", "ilized");
   pdf.text(`${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)`, margin + 3, y + 2);
   y += 15;
 
@@ -387,7 +387,6 @@ async function emailWork() {
   pdf.setFont("helvetica", "normal");
 
   finalData.results.forEach(r => {
-    // Page break if needed
     if (y > pageHeight - 40) {
       pdf.addPage();
       y = 45;
@@ -404,21 +403,17 @@ async function emailWork() {
       pdf.setFontSize(11);
     }
 
-    // Question line
     pdf.setFont("helvetica", "bold");
     pdf.text(`${r.id}: ${r.earned}/${r.max} — ${r.markText}`, margin, y); y += lineHeight;
 
-    // Question text (wrapped)
     pdf.setFont("helvetica", "italic");
     const qLines = pdf.splitTextToSize(r.question, pageWidth - 2 * margin);
     qLines.forEach(l => { pdf.text(l, margin + 2, y); y += lineHeight; });
 
-    // Answer (wrapped)
     pdf.setFont("helvetica", "normal");
     const aLines = pdf.splitTextToSize(`Answer: ${r.answer}`, pageWidth - 2 * margin);
     aLines.forEach(l => { pdf.text(l, margin + 2, y); y += lineHeight; });
 
-    // Tip (if any)
     if (r.earned < r.max && r.hint) {
       pdf.setFont("helvetica", "italic");
       pdf.setTextColor(220, 53, 69);
@@ -426,8 +421,7 @@ async function emailWork() {
       tLines.forEach(l => { pdf.text(l, margin + 2, y); y += lineHeight; });
       pdf.setTextColor(0, 0, 0);
     }
-
-    y += 5; // spacing
+    y += 5;
   });
 
   // ---------- FOOTER ----------
@@ -441,6 +435,8 @@ async function emailWork() {
   const file = new File([pdfBlob], filename, { type: "application/pdf" });
   await sharePDF(file);
 }
+
+
 /* --------------------------------------------------------------
    Toast
    -------------------------------------------------------------- */
