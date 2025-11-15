@@ -1,4 +1,4 @@
-/* script.js – core logic + fetch questions.json */
+/* script.js – core logic + JSON loading + Web Share API */
 const STORAGE_KEY = "TECH_DATA";
 let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { answers: {} };
 let currentAssessment = null;
@@ -203,11 +203,12 @@ window.back = () => {
 };
 
 /* --------------------------------------------------------------
-   Email via PDF + mailto
+   SHARE PDF via Web Share API (fallback: download + mailto)
    -------------------------------------------------------------- */
 window.emailWork = async function () {
   if (!finalData) return alert("Submit first!");
 
+  // Load PDF libraries
   const load = src => new Promise((res, rej) => {
     const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej;
     document.head.appendChild(s);
@@ -272,16 +273,36 @@ window.emailWork = async function () {
 
   const filename = `${finalData.name.replace(/\s+/g, '_')}_${finalData.assessment.id}_${finalData.pct}%.pdf`;
   const pdfBlob = pdf.output('blob');
-  const fileUrl = URL.createObjectURL(pdfBlob);
+  const file = new File([pdfBlob], filename, { type: 'application/pdf' });
 
+  // Try Web Share API
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `${APP_TITLE} – ${finalData.name} (${finalData.pct}%)`,
+        text: `Score: ${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)\nSubmitted: ${finalData.submittedAt}`
+      });
+      return;
+    } catch (err) {
+      console.warn("Share failed or cancelled:", err);
+      // Continue to fallback
+    }
+  }
+
+  // Fallback: download + mailto
+  const fileUrl = URL.createObjectURL(pdfBlob);
   const a = document.createElement('a');
   a.href = fileUrl; a.download = filename; document.body.appendChild(a); a.click();
+
   setTimeout(() => {
-    document.body.removeChild(a); URL.revokeObjectURL(fileUrl);
+    document.body.removeChild(a);
+    URL.revokeObjectURL(fileUrl);
+
     const subject = encodeURIComponent(`${APP_TITLE} – ${finalData.name} (${finalData.pct}%)`);
     const body = encodeURIComponent(`Hi ${finalData.teacherName},\n\nPlease find the assessment attached.\n\nScore: ${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)\nSubmitted: ${finalData.submittedAt}\n\nRegards,\nPukekohe High Tech`);
     window.location.href = `mailto:${finalData.teacherEmail}?subject=${subject}&body=${body}`;
-  }, 1000);
+  }, 800);
 };
 
 /* --------------------------------------------------------------
