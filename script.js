@@ -1,4 +1,4 @@
-/* script.js – core logic + JSON loading + Web Share API */
+/* script.js – core logic + JSON loading + Web Share API (camera-stamper style) */
 const STORAGE_KEY = "TECH_DATA";
 let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { answers: {} };
 let currentAssessment = null;
@@ -203,7 +203,7 @@ window.back = () => {
 };
 
 /* --------------------------------------------------------------
-   SHARE PDF via Web Share API (camera-app style fallback)
+   SHARE PDF via Web Share API (camera-stamper style)
    -------------------------------------------------------------- */
 window.emailWork = async function () {
   if (!finalData) return alert("Submit first!");
@@ -217,7 +217,7 @@ window.emailWork = async function () {
   try {
     await load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await load('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-  } catch (e) { return alert("Failed to load PDF tools."); }
+  } catch (e) { return showToast("Failed to load PDF tools", false); }
 
   const { jsPDF } = window.jspdf;
   const resultEl = document.getElementById('result');
@@ -275,11 +275,10 @@ window.emailWork = async function () {
   const pdfBlob = pdf.output('blob');
   const stampedFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-  // Build share text (like camera app's body)
-  const t = finalData.teacherName;
+  // Build share body (like camera app)
   const body = `Student: ${finalData.name} (ID: ${finalData.id})
 
-Teacher: ${t} (${finalData.teacherEmail})
+Teacher: ${finalData.teacherName} (${finalData.teacherEmail})
 
 Assessment: ${finalData.assessment.title}
 Score: ${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)
@@ -290,9 +289,9 @@ Submitted: ${finalData.submittedAt}`;
   try {
     if (navigator.canShare && navigator.canShare({ files: [stampedFile] })) {
       await navigator.share({ files: [stampedFile], title: subject, text: body });
-      showToast("Shared via app");  // Reuse your camera app's toast (add if not present)
+      showToast("Shared via app");
     } else {
-      // Fallback: download (like camera app)
+      // Fallback: download
       const a = document.createElement('a');
       a.href = URL.createObjectURL(stampedFile);
       a.download = stampedFile.name;
@@ -301,30 +300,49 @@ Submitted: ${finalData.submittedAt}`;
       showToast("Downloaded (share not supported)");
     }
   } catch (e) {
-    // User cancelled or target not available
     console.warn(e);
     if (!String(e).includes('AbortError')) showToast("Share cancelled or unsupported", false);
   }
 };
 
 /* --------------------------------------------------------------
+   Toast helper (from camera stamper)
+   -------------------------------------------------------------- */
+function showToast(text, ok = true) {
+  const toast = document.getElementById('toast') || createToastElement();
+  toast.textContent = text;
+  toast.classList.toggle('error', !ok);
+  toast.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.style.display = 'none', 3200);
+}
+
+function createToastElement() {
+  const t = document.createElement('div');
+  t.id = 'toast';
+  t.className = 'toast';
+  t.role = 'status';
+  t.style.cssText = `
+    display: none; padding: 10px 12px; border-radius: 6px;
+    background: #16a34a; color: #fff; position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%); z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-family: inherit; font-size: 0.95rem;
+  `;
+  document.body.appendChild(t);
+  return t;
+}
+
+/* --------------------------------------------------------------
    Protection
    -------------------------------------------------------------- */
 const PASTE_BLOCKED_MESSAGE = 'Pasting blocked!';
-function showToast(msg) {
-  const t = document.createElement('div'); t.textContent = msg; t.className = 'toast';
-  document.body.appendChild(t);
-  requestAnimationFrame(() => t.style.opacity = 1);
-  setTimeout(() => t.style.opacity = 0, 1800);
-  setTimeout(() => t.remove(), 2200);
-}
 async function clearClipboard() { try { await navigator.clipboard.writeText(''); } catch (_) {} }
 (async () => { await clearClipboard(); })();
 
 function attachProtection() {
   document.querySelectorAll('.answer-field').forEach(f => {
     f.addEventListener('input', () => saveAnswer(f.id.slice(1)));
-    f.addEventListener('paste', e => { e.preventDefault(); showToast(PASTE_BLOCKED_MESSAGE); clearClipboard(); });
+    f.addEventListener('paste', e => { e.preventDefault(); showToast(PASTE_BLOCKED_MESSAGE, false); clearClipboard(); });
     f.addEventListener('copy', e => e.preventDefault());
     f.addEventListener('cut', e => e.preventDefault());
   });
@@ -347,6 +365,6 @@ window.emailWork = emailWork;
     await loadQuestions();
     initApp();
   } catch (err) {
-    // Error already shown in loadQuestions
+    // Error already shown
   }
 })();
