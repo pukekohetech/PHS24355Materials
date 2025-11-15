@@ -330,7 +330,7 @@ function buildEmailBody(fd) {
 }
 
 /* --------------------------------------------------------------
-   Share helper – PDF + text, fallback to mailto (Outlook on Windows)
+   sharePDF – Native share → download → mailto
    -------------------------------------------------------------- */
 async function sharePDF(file) {
   if (!finalData) return;
@@ -338,31 +338,22 @@ async function sharePDF(file) {
   const subject = `${finalData.assessment.title} – ${finalData.name} (${finalData.id})`;
   const fullBody = buildEmailBody(finalData);
 
-  // ------------------------------------------------------------
-  // 1. Try the native Web Share API (mobile browsers)
-  // ------------------------------------------------------------
+  // 1. NATIVE SHARE (mobile)
   if (navigator.share && navigator.canShare) {
-    const shareData = {
-      files: [file],
-      title: subject,
-      text: fullBody
-    };
-
+    const shareData = { files: [file], title: subject, text: fullBody };
     if (navigator.canShare(shareData)) {
       try {
         await navigator.share(shareData);
         showToast("Shared successfully");
-        return;               // ← stop here, no fallback
+        return; // ← stop here
       } catch (err) {
         console.warn("Web Share failed", err);
-        // fall-through to mailto if the user cancelled or something else went wrong
+        // fall through
       }
     }
   }
 
-  // ------------------------------------------------------------
-  // 2. Fallback #1 – download the PDF (desktop browsers)
-  // ------------------------------------------------------------
+  // 2. DOWNLOAD PDF (desktop fallback)
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
@@ -372,9 +363,7 @@ async function sharePDF(file) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
 
-  // ------------------------------------------------------------
-  // 3. Fallback #2 – open the user’s default mail client (Outlook, Apple Mail, etc.)
-  // ------------------------------------------------------------
+  // 3. MAILTO (Outlook / default client)
   const shortBody = [
     `Assessment: ${finalData.assessment.title}`,
     `Student: ${finalData.name} (ID: ${finalData.id})`,
@@ -390,9 +379,8 @@ async function sharePDF(file) {
     `&body=${encodeURIComponent(shortBody)}`;
 
   window.location.href = mailto;
-  showToast("Opening your default mail client…");
+  showToast("Opening your mail client…");
 }
-
 /* --------------------------------------------------------------
    emailWork – generate PDF → sharePDF
    -------------------------------------------------------------- */
