@@ -203,7 +203,7 @@ window.back = () => {
 };
 
 /* --------------------------------------------------------------
-   SHARE PDF via Web Share API (fallback: download + mailto)
+   SHARE PDF via Web Share API (camera-app style fallback)
    -------------------------------------------------------------- */
 window.emailWork = async function () {
   if (!finalData) return alert("Submit first!");
@@ -273,36 +273,38 @@ window.emailWork = async function () {
 
   const filename = `${finalData.name.replace(/\s+/g, '_')}_${finalData.assessment.id}_${finalData.pct}%.pdf`;
   const pdfBlob = pdf.output('blob');
-  const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+  const stampedFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-  // Try Web Share API
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: `${APP_TITLE} – ${finalData.name} (${finalData.pct}%)`,
-        text: `Score: ${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)\nSubmitted: ${finalData.submittedAt}`
-      });
-      return;
-    } catch (err) {
-      console.warn("Share failed or cancelled:", err);
-      // Continue to fallback
+  // Build share text (like camera app's body)
+  const t = finalData.teacherName;
+  const body = `Student: ${finalData.name} (ID: ${finalData.id})
+
+Teacher: ${t} (${finalData.teacherEmail})
+
+Assessment: ${finalData.assessment.title}
+Score: ${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)
+Submitted: ${finalData.submittedAt}`;
+
+  const subject = `printme — ${filename}`;
+
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [stampedFile] })) {
+      await navigator.share({ files: [stampedFile], title: subject, text: body });
+      showToast("Shared via app");  // Reuse your camera app's toast (add if not present)
+    } else {
+      // Fallback: download (like camera app)
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(stampedFile);
+      a.download = stampedFile.name;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+      showToast("Downloaded (share not supported)");
     }
+  } catch (e) {
+    // User cancelled or target not available
+    console.warn(e);
+    if (!String(e).includes('AbortError')) showToast("Share cancelled or unsupported", false);
   }
-
-  // Fallback: download + mailto
-  const fileUrl = URL.createObjectURL(pdfBlob);
-  const a = document.createElement('a');
-  a.href = fileUrl; a.download = filename; document.body.appendChild(a); a.click();
-
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(fileUrl);
-
-    const subject = encodeURIComponent(`${APP_TITLE} – ${finalData.name} (${finalData.pct}%)`);
-    const body = encodeURIComponent(`Hi ${finalData.teacherName},\n\nPlease find the assessment attached.\n\nScore: ${finalData.points}/${finalData.totalPoints} (${finalData.pct}%)\nSubmitted: ${finalData.submittedAt}\n\nRegards,\nPukekohe High Tech`);
-    window.location.href = `mailto:${finalData.teacherEmail}?subject=${subject}&body=${body}`;
-  }, 800);
 };
 
 /* --------------------------------------------------------------
