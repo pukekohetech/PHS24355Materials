@@ -3,8 +3,8 @@
   "short_name": "Materials Tech",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#1a4971",
-  "theme_color": "#1a4971",
+  "background_color": "#6e1818",
+  "theme_color": "#6e1818",
   "orientation": "portrait-primary",
   "scope": ".",
   "icons": [

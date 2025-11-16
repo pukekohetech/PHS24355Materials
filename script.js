@@ -212,27 +212,50 @@ function submitWork() {
   if (data.id && document.getElementById("id").value !== data.id) return alert("ID locked to: " + data.id);
 
   const { total, results } = gradeIt();
-  const totalPoints = currentAssessment.totalPoints || currentAssessment.questions.reduce((s, q) => s + q.maxPoints, 0);
-  const pct = totalPoints ? Math.round((total / totalPoints) * 100) : 0;
-
+  // Determine total points for the current assessment. If the JSON defines totalPoints use that,
+  // otherwise sum the maxPoints of each question.
+  const totalPoints =
+    currentAssessment.totalPoints ||
+    currentAssessment.questions.reduce((sum, q) => sum + q.maxPoints, 0);
+  // Calculate the percentage score out of 100.
+  const pct = totalPoints
+    ? Math.round((total / totalPoints) * 100)
+    : 0;
+  // Look up the selected teacher's email from the teacher <select>. The value of the option is the email.
+  const teacherSelect = document.getElementById("teacher");
+  const teacherEmail = teacherSelect.value;
+  let teacherName = "";
+  if (teacherEmail) {
+    const optionIndex = teacherSelect.selectedIndex;
+    if (optionIndex >= 0) {
+      teacherName = teacherSelect.options[optionIndex].textContent;
+    }
+  }
+  // Create a timestamp in New Zealand format (dd/mm/yyyy, HH:MM) using the Pacific/Auckland timezone.
+  const submittedAt = new Date().toLocaleString("en-NZ", {
+    timeZone: "Pacific/Auckland",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  // Build the finalData object used for emailing and PDF generation. Store all values explicitly
+  // rather than relying on undefined variables. Include teacher name and email, total points and score.
   finalData = {
-    name, id, username,
-    teacherName: document.getElementById("teacher").selectedOptions[0].textContent,
-    teacherEmail: data.teacher,
+    name,
+    id,
+    username,
+    teacherName,
+    teacherEmail,
     assessment: currentAssessment,
+    submittedAt,
     points: total,
     totalPoints,
     pct,
-   submittedAt: new Date().toLocaleString("en-NZ", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false
-}),
-    results
+    results,
   };
+  
 
   // Show student name + username/device login in the on-screen results
 const displayUsername = username || detectedUsername || "";
@@ -379,7 +402,8 @@ async function emailWork() {
   let y = 45;
 
   // Header
-  pdf.setFillColor(26, 73, 113);
+  // Use the crest-inspired red for the PDF header
+  pdf.setFillColor(110, 24, 24);
   pdf.rect(0, 0, pageWidth, 35, "F");
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(18);
@@ -402,7 +426,8 @@ async function emailWork() {
       pdf.addPage();
       y = 20;
       // Re-add header
-      pdf.setFillColor(26, 73, 113);
+      // Use the crest-inspired red when creating new pages in the PDF
+      pdf.setFillColor(110, 24, 24);
       pdf.rect(0, 0, pageWidth, 35, "F");
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(18);
