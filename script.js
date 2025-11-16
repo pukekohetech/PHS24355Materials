@@ -223,7 +223,14 @@ function submitWork() {
     points: total,
     totalPoints,
     pct,
-    submittedAt: new Date().toLocaleString(),
+   submittedAt: new Date().toLocaleString("en-NZ", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false
+}),
     results
   };
 
