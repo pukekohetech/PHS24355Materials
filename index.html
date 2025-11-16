@@ -6,10 +6,12 @@
   
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Set the browser's theme color to match the PHS crest -->
+  <meta name="theme-color" content="#6e1818">
   <title id="page-title">Loading…</title>
 
   <!-- ========================================
-       CSS – Clean, Responsive, Easy to Edit
+       CSS – Clean, Responsive, Easy to Edit 
        ======================================== -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,7 +31,8 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, .1);
     }
     header {
-      background: #1a4971;
+      /* Use a dark red background inspired by the Pukekohe High School crest */
+      background: #6e1818;
       color: #fff;
       padding: 20px;
       text-align: center;
@@ -59,8 +62,9 @@
     }
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: #1a4971;
-      box-shadow: 0 0 0 2px rgba(26, 73, 113, .2);
+      /* Dark red highlight on focus */
+      border-color: #6e1818;
+      box-shadow: 0 0 0 2px rgba(110, 24, 24, .2);
     }
     .locked-msg {
       font-size: .9rem;
@@ -68,7 +72,7 @@
       margin-top: 5px;
     }
     .assessment-header {
-      background: #1a4971;
+      background: #6e1818;
       color: #fff;
       padding: 15px;
       border-radius: 10px;
@@ -82,12 +86,14 @@
       padding: 18px;
       margin-bottom: 18px;
       border-radius: 8px;
-      border-left: 4px solid #1a4971;
+      /* Dark red accent bar on question blocks */
+      border-left: 4px solid #6e1818;
     }
     .q strong { color: #2c3e50; font-size: 1.1rem; }
     .answer-field { margin-top: 10px; font-family: inherit; }
     .btn {
-      background: #1a4971;
+      /* Primary buttons use the crest-inspired red */
+      background: #6e1818;
       color: #fff;
       border: none;
       padding: 12px 20px;
@@ -97,13 +103,14 @@
       transition: background .2s;
       margin-right: 10px;
     }
-    .btn:hover { background: #0f3a56; }
+    /* Darken the red slightly on hover */
+    .btn:hover { background: #4b0f0f; }
     .btn-secondary { background: #7f8c8d; }
     .btn-secondary:hover { background: #95a5a6; }
     .btn-group { margin-top: 20px; text-align: center; }
     .result-section { padding: 25px; text-align: center; }
     .result-header { margin-bottom: 25px; }
-    .grade { font-size: 2.5rem; font-weight: bold; color: #1a4971; }
+    .grade { font-size: 2.5rem; font-weight: bold; color: #6e1818; }
     .grade small { font-size: 1.2rem; color: #7f8c8d; }
     .feedback {
       text-align: left;
