@@ -236,7 +236,7 @@ document.getElementById("student").textContent =
           detectedUsername && detectedUsername === displayUsername ? " (Device Auto)" : ""
         })`
       : ""
-  }`;
+  } – ID: ${id}`;
 
   document.getElementById("teacher-name").textContent = finalData.teacherName;
   document.getElementById("grade").innerHTML = `${total}/${totalPoints}<br><small>(${pct}%)</small>`;
