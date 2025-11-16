@@ -215,24 +215,27 @@ function submitWork() {
   const totalPoints = currentAssessment.totalPoints || currentAssessment.questions.reduce((s, q) => s + q.maxPoints, 0);
   const pct = totalPoints ? Math.round((total / totalPoints) * 100) : 0;
 
-  finalData = {
-    name, id, username,
-    teacherName: document.getElementById("teacher").selectedOptions[0].textContent,
-    teacherEmail: data.teacher,
-    assessment: currentAssessment,
-    points: total,
-    totalPoints,
-    pct,
-   submittedAt: new Date().toLocaleString("en-NZ", {
+finalData = {
+  name,
+  id,
+  username,
+  teacherName,
+  teacherEmail,
+  assessment: currentAssessment,
+  submittedAt: new Date().toLocaleString("en-NZ", {
   day: "2-digit",
-  month: "2-digit",
+  month: "short",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
   hour12: false
 }),
-    results
-  };
+  points: totalEarned,
+  totalPoints: totalPossible,
+  pct: pct,
+  results
+};
+  
 
   // Show student name + username/device login in the on-screen results
 const displayUsername = username || detectedUsername || "";
