@@ -263,7 +263,7 @@ function back() {
    Email body
    -------------------------------------------------------------- */
 function buildEmailBody(fd) {
-  // Prefer the stored username; fall back to auto-detected device login
+  // Prefer stored username; fall back to auto-detected login
   const username = fd.username || detectedUsername || "";
 
   const lines = [];
@@ -271,10 +271,10 @@ function buildEmailBody(fd) {
   lines.push(APP_SUBTITLE);
   lines.push("");
 
-  // Assessment line
+  // Assessment
   lines.push(`Assessment: ${fd.assessment.title} – ${fd.assessment.subtitle}`);
 
-  // Student line (name + login + ID)
+  // Student line: name + login + ID
   lines.push(
     `Student: ${fd.name}${
       username
@@ -285,7 +285,7 @@ function buildEmailBody(fd) {
     } – ID: ${fd.id}`
   );
 
-  // Teacher line (ALWAYS include email if we have it)
+  // Teacher line: name + email (if we have it)
   lines.push(
     `Teacher: ${fd.teacherName}${
       fd.teacherEmail ? ` <${fd.teacherEmail}>` : ""
@@ -295,7 +295,7 @@ function buildEmailBody(fd) {
   lines.push(`Submitted: ${fd.submittedAt}`);
   lines.push("");
 
-  // Score summary
+  // Score
   lines.push(`Score: ${fd.points}/${fd.totalPoints} (${fd.pct}%)`);
   lines.push("=".repeat(60));
   lines.push("");
