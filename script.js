@@ -222,14 +222,7 @@ finalData = {
   teacherName,
   teacherEmail,
   assessment: currentAssessment,
-  submittedAt: new Date().toLocaleString("en-NZ", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false
-}),
+  submittedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
   points: totalEarned,
   totalPoints: totalPossible,
   pct: pct,
